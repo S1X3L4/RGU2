@@ -1,62 +1,87 @@
-// TodoList.jsx
-import React, { useState } from 'react';
-import TodoItem from '../components/TodoItem';
+import React, { useEffect, useState } from 'react';
 
-function TodoList() {
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      text: 'Check WebSite',
-      completed: false
-    },
-
-  ]);
-
+function Todo() {
+  const [tasks, setTasks] = useState([]);
   const [text, setText] = useState('');
+  const token = localStorage.getItem('token');
 
-  function addTask(text) {
-    if (text.trim() === '') return;
+  useEffect(() => {
+    if (!token) return;
+    fetch('http://localhost:5000/api/todos', {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+      .then(res => res.json())
+      .then(setTasks)
+      .catch(console.error);
+  }, [token]);
 
-    const newTask = {
-      id: Date.now(),
-      text,
-      completed: false
-    };
-    setTasks([...tasks, newTask]);
-    setText('');
-  }
-
-  function deleteTask(id) {
-    setTasks(tasks.filter(task => task.id !== id));
+  function addTask() {
+    if (!text.trim()) return;
+    fetch('http://localhost:5000/api/todos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token
+      },
+      body: JSON.stringify({ text })
+    })
+      .then(res => res.json())
+      .then(newTask => {
+        setTasks([...tasks, newTask]);
+        setText('');
+      });
   }
 
   function toggleCompleted(id) {
-    setTasks(tasks.map(task =>
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+    fetch(`http://localhost:5000/api/todos/${id}/toggle`, {
+      method: 'PUT',
+      headers: {
+        Authorization: 'Bearer ' + token
+      }
+    })
+      .then(res => res.json())
+      .then(updatedTask => {
+        setTasks(tasks.map(t => (t._id === id ? updatedTask : t)));
+      });
   }
 
+  function deleteTask(id) {
+    fetch(`http://localhost:5000/api/todos/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: 'Bearer ' + token
+      }
+    }).then(() => {
+      setTasks(tasks.filter(t => t._id !== id));
+    });
+  }
+
+  // Ici le JSX retourné (interface utilisateur)
   return (
-    <div className="todo-list">
+    <div>
       <h2>Todo List</h2>
-
-      {tasks.map(task => (
-        <TodoItem
-          key={task.id}
-          task={task}
-          deleteTask={deleteTask}
-          toggleCompleted={toggleCompleted}
-        />
-      ))}
-
-      <input
-        value={text}
-        onChange={e => setText(e.target.value)}
-        placeholder="Enter a task"
+      <input 
+        value={text} 
+        onChange={e => setText(e.target.value)} 
+        placeholder="Enter a task" 
       />
-      <button onClick={() => addTask(text)}>Add</button>
+      <button onClick={addTask}>Add</button>
+
+      <ul>
+        {tasks.map(task => (
+          <li key={task._id}>
+            <input 
+              type="checkbox" 
+              checked={task.completed} 
+              onChange={() => toggleCompleted(task._id)} 
+            />
+            {task.text}
+            <button onClick={() => deleteTask(task._id)}>Delete</button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-export default TodoList;
+export default Todo;
